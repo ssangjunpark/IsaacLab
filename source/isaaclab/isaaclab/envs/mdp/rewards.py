@@ -20,6 +20,8 @@ from isaaclab.managers.manager_base import ManagerTermBase
 from isaaclab.managers.manager_term_cfg import RewardTermCfg
 from isaaclab.sensors import ContactSensor, RayCaster
 
+from isaaclab.envs.mdp import observations as obs
+
 if TYPE_CHECKING:
     from isaaclab.envs import ManagerBasedRLEnv
 
@@ -96,6 +98,21 @@ def flat_orientation_l2(env: ManagerBasedRLEnv, asset_cfg: SceneEntityCfg = Scen
     asset: RigidObject = env.scene[asset_cfg.name]
     return torch.sum(torch.square(asset.data.projected_gravity_b[:, :2]), dim=1)
 
+from isaacsim.core.simulation_manager import SimulationManager
+import isaaclab.utils.math as math_utils
+
+def projected_gravity_b(quat):
+    physics_sim_view = SimulationManager.get_physics_sim_view()
+    gravity = physics_sim_view.get_gravity()
+    gravity_dir = torch.tensor((gravity[0], gravity[1], gravity[2]), device="cuda:0")
+    gravity_dir = math_utils.normalize(gravity_dir.unsqueeze(0)).squeeze(0)
+    """Projection of the gravity direction on base frame. Shape is (num_instances, 3)."""
+    return math_utils.quat_apply_inverse(quat, gravity_dir.repeat(quat.shape[0], 1))
+
+def flat_feet_orientation_l2(env: ManagerBasedRLEnv) -> torch.Tensor:
+    lf = projected_gravity_b(env.scene['robot'].data.body_link_quat_w[:, env.scene['robot'].find_bodies('l_foot')[0][0],:])
+    rf = projected_gravity_b(env.scene['robot'].data.body_link_quat_w[:, env.scene['robot'].find_bodies('r_foot')[0][0],:])
+    return torch.exp(-torch.sum(torch.abs(lf) + torch.abs(rf), dim=1))
 
 def base_height_l2(
     env: ManagerBasedRLEnv,
