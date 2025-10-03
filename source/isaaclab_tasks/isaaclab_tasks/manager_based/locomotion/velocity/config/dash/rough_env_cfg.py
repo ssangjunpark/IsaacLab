@@ -17,6 +17,8 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import Lo
 from .dash_cfg import Dash_MINIMAL_CFG  # isort: skip
 
 
+
+
 @configclass
 class DashRewards():
     """Reward terms for the MDP."""
@@ -30,6 +32,17 @@ class DashRewards():
     track_ang_vel_z_exp = RewTerm(
         func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"command_name": "base_velocity", "std": 0.5}
     )
+
+    step_time_diff_pen = RewTerm(
+        func=mdp.feet_air_time_balanced_biped,
+        weight=2,
+        params={
+            "command_name": "base_velocity",
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+            "threshold": 0.4,
+        },
+    )
+
     # -- penalties
     lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
     ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
@@ -149,7 +162,7 @@ class DashRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         )
 
         # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (-0.5, 2.0)
+        self.commands.base_velocity.ranges.lin_vel_x = (-0.5, 2)
         self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
 
@@ -176,9 +189,6 @@ class DashRoughEnvCfg_PLAY(DashRoughEnvCfg):
             self.scene.terrain.terrain_generator.num_cols = 5
             self.scene.terrain.terrain_generator.curriculum = False
 
-        self.commands.base_velocity.ranges.lin_vel_x = (1.0, 1.0)
-        self.commands.base_velocity.ranges.lin_vel_y = (0.0, 0.0)
-        self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
         self.commands.base_velocity.ranges.heading = (0.0, 0.0)
         # disable randomization for play
         self.observations.policy.enable_corruption = False

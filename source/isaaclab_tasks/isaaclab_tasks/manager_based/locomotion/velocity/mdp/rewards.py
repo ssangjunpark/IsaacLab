@@ -44,6 +44,45 @@ def feet_air_time(
     reward *= torch.norm(env.command_manager.get_command(command_name)[:, :2], dim=1) > 0.1
     return reward
 
+def feet_air_time_balanced_biped(
+    env,
+    command_name: str,
+    threshold: float,
+    sensor_cfg,
+    *,
+    tolerance: float = 0.05,
+    penalty_scale: float = 1.0,
+    non_single_stance_penalty: float = 0.1,
+    speed_gate: float = 0.1,
+    eps: float = 1e-6,
+) -> torch.Tensor:
+    contact_sensor: ContactSensor = env.scene.sensors[sensor_cfg.name]
+    air_time = contact_sensor.data.current_air_time[:, sensor_cfg.body_ids]
+    contact_time = contact_sensor.data.current_contact_time[:, sensor_cfg.body_ids] 
+    in_contact = contact_time > 0.0
+   
+    in_mode_time = torch.where(in_contact, contact_time, air_time) 
+    single_stance = (in_contact.int().sum(dim=1) == 1)
+    # but only during single-stance (else 0). This keeps steps alternating & bounded.
+    in_mode_time_masked = torch.where(single_stance.unsqueeze(-1), in_mode_time, torch.zeros_like(in_mode_time))
+    base_reward, _ = torch.min(in_mode_time_masked, dim=1)   # [B]
+    base_reward = torch.clamp(base_reward, max=threshold)    # Imbalance penalty (only during single stance):
+
+    tL = in_mode_time[:, 0]
+    tR = in_mode_time[:, 1]
+    rel_imbalance = (tL - tR).abs() / (tL + tR + eps)
+
+
+    excess = torch.clamp(rel_imbalance - tolerance, min=0.0) # [B]
+    imbalance_penalty = penalty_scale * excess * single_stance.float()    # Non-single-stance (double-stance or flight) penalty
+    not_single = (~single_stance).float()
+    phase_penalty = non_single_stance_penalty * not_single    # Gate by motion command magnitude (no reward when agent is intended to stand still)
+    cmd_xy = env.command_manager.get_command(command_name)[:, :2]
+    moving = (torch.norm(cmd_xy, dim=1) > speed_gate).float()    
+    reward = (base_reward - imbalance_penalty - phase_penalty) * moving
+
+    reward = torch.clamp(reward, min=0.0)
+    return reward
 
 def feet_air_time_positive_biped(env, command_name: str, threshold: float, sensor_cfg: SceneEntityCfg) -> torch.Tensor:
     """Reward long steps taken by the feet for bipeds.
