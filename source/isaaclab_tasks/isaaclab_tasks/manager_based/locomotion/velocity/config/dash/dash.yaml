@@ -28,7 +28,7 @@ body_names: ['torso', 'l_hip', 'r_hip', 'l_dist_hip', 'r_dist_hip', 'l_upper_leg
 limb_weight_group: 
   - ['l_hip', 'l_dist_hip', 'l_upper_leg', 'l_lower_leg', 'l_foot']
   - ['r_hip', 'r_dist_hip', 'r_upper_leg', 'r_lower_leg', 'r_foot']
-  - ['torso', 'torso_link']
+  - ['torso']
   - ['l_prox_shoulder', 'l_dist_shoulder', 'l_upper_arm', 'l_lower_arm']
   - ['r_prox_shoulder', 'r_dist_shoulder', 'r_upper_arm', 'r_lower_arm']
 
@@ -37,10 +37,10 @@ limb_weight_group:
 right_foot_name: 'l_foot'
 left_foot_name: 'r_foot'
 
-# asset:
-#   assetRoot: "./"
-#   assetFileName: "phc/data/assets/robot/unitree_g1/g1.xml"
-#   urdfFileName: "phc/data/assets/robot/unitree_g1/g1.xml"
+asset:
+  assetRoot: "/home/isaac/Documents/Github/DASH_URDF/"
+  assetFileName: "mjmodel.xml"
+  urdfFileName: "mjmodel.xml"
 
 
 # extend_config:
