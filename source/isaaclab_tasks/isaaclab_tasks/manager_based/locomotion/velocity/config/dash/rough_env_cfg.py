@@ -17,51 +17,97 @@ from isaaclab_tasks.manager_based.locomotion.velocity.velocity_env_cfg import Lo
 from .dash_cfg import Dash_MINIMAL_CFG  # isort: skip
 
 
-
-
 @configclass
 class DashRewards():
     """Reward terms for the MDP."""
 
-    termination_penalty = RewTerm(func=mdp.is_terminated, weight=-50.0)
+    termination_penalty = RewTerm(func=mdp.is_terminated, weight=-150.0)
+
     track_lin_vel_xy_exp = RewTerm(
         func=mdp.track_lin_vel_xy_yaw_frame_exp,
-        weight=2.0,
-        params={"command_name": "base_velocity", "std": 0.5},
+        weight=10.0,
+        params={"command_name": "base_velocity", "std": 0.4},
     )
+
     track_ang_vel_z_exp = RewTerm(
-        func=mdp.track_ang_vel_z_world_exp, weight=2.0, params={"command_name": "base_velocity", "std": 0.5}
+        func=mdp.track_ang_vel_z_world_exp, weight=1.5, params={"command_name": "base_velocity", "std": 0.5}
     )
 
     step_time_diff_pen = RewTerm(
         func=mdp.feet_air_time_balanced_biped,
-        weight=2,
+        weight=-2,
         params={
             "command_name": "base_velocity",
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
-            "threshold": 0.4,
+            "threshold": 0.15,
+        },
+    )
+
+    feet_air_time = RewTerm(
+        func=mdp.feet_air_time_positive_biped_pen,
+        weight=-2,
+        params={
+            "command_name": "base_velocity",
+            "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+            "threshold": 0.18,
         },
     )
 
     # -- penalties
-    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-2.0)
-    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.05)
-    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-1.0e-5)
-    dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-2.5e-7)
-    action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
-    feet_air_time = RewTerm(
-        func=mdp.feet_air_time_positive_biped,
-        weight=2,
+    lin_vel_z_l2 = RewTerm(func=mdp.lin_vel_z_l2, weight=-0.2)
+    ang_vel_xy_l2 = RewTerm(func=mdp.ang_vel_xy_l2, weight=-0.1)
+
+    lin_vel_xy_l2 = RewTerm(
+        func=mdp.lin_xy_bad,
+        weight=-0.05,
+        params={"command_name": "base_velocity", "std": 0.4},
+    )
+
+    dof_torques_l2 = RewTerm(func=mdp.joint_torques_l2, weight=-4.0e-8)
+    dof_acc_l2 = RewTerm(func=mdp.joint_acc_l2, weight=-5e-8)
+    # action_rate_l2 = RewTerm(func=mdp.action_rate_l2, weight=-0.01)
+
+
+    # braking_impulse_pen = RewTerm(
+        # func=mdp.braking_impulse_penalty,
+        # weight=-0.6,
+        # params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot")},
+    # )
+
+
+    sprint_bonus = RewTerm(
+        func=mdp.sprint_bonus,
+        weight=3.0,
         params={
-            "command_name": "base_velocity",
+            "min_speed": 1,
+            "min_flight": 0.15,
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
-            "threshold": 0.4,
         },
     )
 
+    # footstrike_behind_com = RewTerm(
+    #     func=mdp.footstrike_behind_com_bonus,
+    #     weight=0.6,
+    #     params={
+    #         "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+    #         "x_offset_target": -0.06,
+    #         "tolerance": 0.08,
+    #     },
+    # )
+
+    # symmetric_stride = RewTerm(
+    #     func=mdp.symmetric_stride_bonus,
+    #     weight=0.8,
+    #     params={
+    #         "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
+    #         "max_allowable_diff": 0.08,
+    #     },
+    # )
+
     feet_slide = RewTerm(
         func=mdp.feet_slide,
-        weight=-0.2,
+        weight=-0.25,
         params={
             "sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*_foot"),
             "asset_cfg": SceneEntityCfg("robot", body_names=".*_foot"),
@@ -71,18 +117,18 @@ class DashRewards():
     # Penalize ankle joint limits
     dof_pos_limits = RewTerm(
         func=mdp.joint_pos_limits,
-        weight=-1.0,
+        weight=-0.7,
         params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_ankle_pitch", ".*_hip_roll"])},
     )
     # Penalize deviation from default of the joints that are not essential for locomotion
-    joint_deviation_hip = RewTerm(
-        func=mdp.joint_deviation_l1,
-        weight=-0.1,
-        params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_yaw", ".*_hip_roll"])},
-    )
+    # joint_deviation_hip = RewTerm(
+    #     func=mdp.joint_deviation_l1,
+    #     weight=-0.01,
+    #     params={"asset_cfg": SceneEntityCfg("robot", joint_names=[".*_hip_yaw", ".*_hip_roll"])},
+    # )
     joint_deviation_arms = RewTerm(
         func=mdp.joint_deviation_l1,
-        weight=-0.1,
+        weight=-0.01,
         params={
             "asset_cfg": SceneEntityCfg(
                 "robot",
@@ -97,13 +143,13 @@ class DashRewards():
     )
     undesired_contacts = RewTerm(
         func=mdp.undesired_contacts,
-        weight=-1.0,
+        weight=-0.5,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names=".*THIGH"), "threshold": 1.0},
     )
     # -- optional penalties
-    flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-1.0)
+    # flat_orientation_l2 = RewTerm(func=mdp.flat_orientation_l2, weight=-2.0)
     
-    flat_feet_orientation_l2 = RewTerm(func=mdp.flat_feet_orientation_l2, weight=1.0)
+    # flat_feet_orientation_l2 = RewTerm(func=mdp.flat_feet_orientation_l2, weight=1.0)
 
 @configclass
 class DashTerminationsCfg:
@@ -114,7 +160,7 @@ class DashTerminationsCfg:
         func=mdp.illegal_contact,
         params={"sensor_cfg": SceneEntityCfg("contact_forces", body_names="base"), "threshold": 1.0},
     )
-    torso_height = DoneTerm(func=mdp.root_height_below_minimum, params={"minimum_height": 0.5})
+    torso_height = DoneTerm(func=mdp.root_height_below_minimum, params={"minimum_height": 0.3})
 
 
 @configclass
@@ -148,10 +194,8 @@ class DashRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         self.events.base_com = None
 
         # Rewards
-        self.rewards.lin_vel_z_l2.weight = 0.0
         self.rewards.undesired_contacts = None
-        self.rewards.flat_orientation_l2.weight = -1.0
-        self.rewards.action_rate_l2.weight = -0.005
+        # self.rewards.action_rate_l2.weight = -0.005
         self.rewards.dof_acc_l2.weight = -1.25e-7
         self.rewards.dof_acc_l2.params["asset_cfg"] = SceneEntityCfg(
             "robot", joint_names=[".*_hip_.*", ".*_knee_pitch"]
@@ -162,8 +206,10 @@ class DashRoughEnvCfg(LocomotionVelocityRoughEnvCfg):
         )
 
         # Commands
-        self.commands.base_velocity.ranges.lin_vel_x = (-0.5, 2)
-        self.commands.base_velocity.ranges.lin_vel_y = (-0.5, 0.5)
+        # self.commands.base_velocity.ranges.lin_vel_x = (-0.5, 5)
+        self.commands.base_velocity.ranges.lin_vel_x = (1, 2.5)
+
+        self.commands.base_velocity.ranges.lin_vel_y = (0, 0)
         self.commands.base_velocity.ranges.ang_vel_z = (-1.0, 1.0)
 
         # terminations
